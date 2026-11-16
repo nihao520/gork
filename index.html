@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Polymarket 5分钟纸上对锁盘</title>
+  <style>
+    :root {
+      --bg: #0b1020;
+      --bg2: #12182b;
+      --card: #171e33;
+      --line: #2a3350;
+      --text: #e8edf7;
+      --muted: #93a0bf;
+      --dim: #6d7896;
+      --up: #3dd68c;
+      --down: #ff6b7a;
+      --warn: #ffc857;
+      --accent: #7aa2ff;
+      --banner: #3a2a10;
+      --good-bg: rgba(61, 214, 140, 0.12);
+      --bad-bg: rgba(255, 107, 122, 0.12);
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; background: var(--bg); color: var(--text); font-family: "PingFang SC", "Noto Sans SC", "Source Han Sans SC", "Microsoft YaHei", ui-sans-serif, system-ui, sans-serif; }
+    body { min-height: 100vh; line-height: 1.45; }
+    .wrap { max-width: 1100px; margin: 0 auto; padding: 16px 14px 40px; }
+    header { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 10px; margin-bottom: 14px; }
+    h1 { font-size: 1.35rem; margin: 0 0 6px; letter-spacing: 0.02em; }
+    .sub { color: var(--muted); font-size: 0.86rem; }
+    .banner {
+      display: inline-block; background: var(--banner); color: var(--warn);
+      border: 1px solid #7a5a18; border-radius: 999px; padding: 4px 12px;
+      font-weight: 700; font-size: 0.82rem; letter-spacing: 0.08em;
+    }
+    .clock { color: var(--dim); font-size: 0.8rem; text-align: right; }
+    .kpis { display: grid; grid-template-columns: repeat(6, 1fr); gap: 10px; margin: 14px 0; }
+    .card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 12px 14px; }
+    .kpi .lbl { color: var(--muted); font-size: 0.75rem; }
+    .kpi .val { font-size: 1.15rem; font-weight: 700; margin-top: 4px; font-variant-numeric: tabular-nums; }
+    .pos { color: var(--up); }
+    .neg { color: var(--down); }
+    .row { display: grid; grid-template-columns: 1.2fr 0.8fr; gap: 10px; margin-bottom: 10px; }
+    h2 { font-size: 0.95rem; margin: 0 0 10px; color: var(--accent); font-weight: 650; }
+    .countdown { font-size: 1.6rem; font-weight: 800; font-variant-numeric: tabular-nums; }
+    .books { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .side { background: var(--bg2); border-radius: 10px; padding: 10px; }
+    .side.up { border-left: 3px solid var(--up); }
+    .side.down { border-left: 3px solid var(--down); }
+    .side h3 { margin: 0 0 6px; font-size: 0.9rem; }
+    .px { font-variant-numeric: tabular-nums; font-size: 0.92rem; }
+    .sum { margin-top: 8px; color: var(--muted); font-size: 0.88rem; }
+    .inv { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 0.88rem; font-variant-numeric: tabular-nums; }
+    .pill { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 0.75rem; background: var(--bg2); color: var(--muted); }
+    table { width: 100%; border-collapse: collapse; font-size: 0.8rem; }
+    th, td { text-align: left; padding: 6px 6px; border-bottom: 1px solid var(--line); font-variant-numeric: tabular-nums; vertical-align: top; }
+    th { color: var(--dim); font-weight: 600; }
+    .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+    .stat { background: var(--bg2); border-radius: 10px; padding: 10px; }
+    .stat .lbl { color: var(--muted); font-size: 0.72rem; }
+    .stat .val { font-weight: 700; margin-top: 3px; font-variant-numeric: tabular-nums; }
+    .disclaimer { margin-top: 16px; color: var(--warn); font-size: 0.82rem; background: #241c0d; border: 1px solid #5a4718; border-radius: 10px; padding: 10px 12px; }
+    .stale { color: var(--down); font-weight: 700; }
+    .ok { color: var(--up); }
+    .scroll { overflow-x: auto; }
+    @media (max-width: 900px) {
+      .kpis { grid-template-columns: repeat(3, 1fr); }
+      .row, .stats { grid-template-columns: 1fr; }
+    }
+    @media (max-width: 560px) {
+      .kpis { grid-template-columns: repeat(2, 1fr); }
+      h1 { font-size: 1.15rem; }
+      .wrap { padding: 12px 10px 32px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <div>
+        <div class="banner">纸上测试 · 不下真实单</div>
+        <h1>Polymarket 5分钟纸上对锁盘</h1>
+        <div class="sub">只交易当前窗口的 Bitcoin Up or Down 5 分钟盘，按官方结算，不做中途平仓。此页是公开同步快照，不是实时盘口通道。</div>
+      </div>
+      <div class="clock">
+        <div id="nowHkt">--</div>
+        <div id="health">行情：--</div>
+      </div>
+    </header>
+
+    <section class="kpis">
+      <div class="card kpi"><div class="lbl">权益</div><div class="val" id="equity">--</div></div>
+      <div class="card kpi"><div class="lbl">现金</div><div class="val" id="cash">--</div></div>
+      <div class="card kpi"><div class="lbl">持仓市值</div><div class="val" id="posValue">--</div></div>
+      <div class="card kpi"><div class="lbl">已实现盈亏</div><div class="val" id="realized">--</div></div>
+      <div class="card kpi"><div class="lbl">未实现盈亏</div><div class="val" id="unrealized">--</div></div>
+      <div class="card kpi"><div class="lbl">累计手续费</div><div class="val" id="fees">--</div></div>
+    </section>
+
+    <section class="row">
+      <div class="card">
+        <h2>当前窗口</h2>
+        <div id="winTitle" style="font-weight:700">加载中…</div>
+        <div class="sub" id="winRange"></div>
+        <div class="countdown" id="countdown">--</div>
+        <div class="books" style="margin-top:10px">
+          <div class="side up">
+            <h3 style="color:var(--up)">Up</h3>
+            <div class="px" id="upBook">买 / 卖 --</div>
+          </div>
+          <div class="side down">
+            <h3 style="color:var(--down)">Down</h3>
+            <div class="px" id="downBook">买 / 卖 --</div>
+          </div>
+        </div>
+        <div class="sum" id="askSum"></div>
+      </div>
+      <div class="card">
+        <h2>本窗口持仓</h2>
+        <div class="inv">
+          <div>Up 数量<br><b id="upShares">0</b></div>
+          <div>Up 均价<br><b id="upAvg">--</b></div>
+          <div>Down 数量<br><b id="downShares">0</b></div>
+          <div>Down 均价<br><b id="downAvg">--</b></div>
+          <div>已锁配对<br><b id="locked">0</b></div>
+          <div>未匹配<br><b id="unmatched">无</b></div>
+        </div>
+        <div class="sub" style="margin-top:10px" id="pairCost"></div>
+        <div><span class="pill" id="invStatus">flat</span></div>
+      </div>
+    </section>
+
+    <section class="card" style="margin-bottom:10px">
+      <h2>汇总</h2>
+      <div class="stats">
+        <div class="stat"><div class="lbl">已结算窗口</div><div class="val" id="stWindows">0</div></div>
+        <div class="stat"><div class="lbl">双边成交占比</div><div class="val" id="stBoth">--</div></div>
+        <div class="stat"><div class="lbl">平均锁对成本</div><div class="val" id="stPair">--</div></div>
+        <div class="stat"><div class="lbl">最好 / 最差窗口</div><div class="val" id="stBest" style="font-size:0.9rem">--</div></div>
+      </div>
+    </section>
+
+    <section class="card" style="margin-bottom:10px">
+      <h2>最近纸上成交</h2>
+      <div class="scroll">
+        <table>
+          <thead><tr><th>时间 (HKT)</th><th>窗口</th><th>方向</th><th>数量</th><th>价格</th><th>费用</th><th>原因</th></tr></thead>
+          <tbody id="fills"><tr><td colspan="7" class="sub">还没有成交</td></tr></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>最近官方结算</h2>
+      <div class="scroll">
+        <table>
+          <thead><tr><th>时间 (HKT)</th><th>窗口</th><th>胜出</th><th>派发</th><th>盈亏</th><th>锁对 / 未匹配</th></tr></thead>
+          <tbody id="settles"><tr><td colspan="6" class="sub">还没有结算</td></tr></tbody>
+        </table>
+      </div>
+    </section>
+
+    <div class="disclaimer" id="disclaimer">
+      纸上成交比真实盘口更乐观，未计入下单延迟、排队和抢单竞争，不能当作实盘收益。
+    </div>
+  </div>
+  <script>
+    // Static GitHub Pages snapshot. Data is published from the paper desk.
+    const STATE_URL = "./state.json";
+
+    const $ = (id) => document.getElementById(id);
+    function usd(n, d = 2) {
+      if (n == null || !Number.isFinite(Number(n))) return "--";
+      const x = Number(n);
+      const sign = x < 0 ? "-" : "";
+      return sign + "$" + Math.abs(x).toFixed(d);
+    }
+    function px(n) {
+      if (n == null || !Number.isFinite(Number(n))) return "--";
+      return Number(n).toFixed(3);
+    }
+    function pn(el, n) {
+      el.textContent = usd(n);
+      el.className = "val " + (n > 0.0005 ? "pos" : n < -0.0005 ? "neg" : "");
+    }
+    function fmtLeft(sec) {
+      sec = Math.max(0, Math.floor(sec || 0));
+      const m = Math.floor(sec / 60);
+      const s = sec % 60;
+      return String(m).padStart(2, "0") + ":" + String(s).padStart(2, "0");
+    }
+
+    let last = null;
+    let lastEnd = 0;
+
+    function render(d) {
+      last = d;
+      $("nowHkt").textContent = d.nowHkt || "";
+      const stale = d.stale;
+      const publishedAge = d.publishedAt ? (Date.now() - Number(d.publishedAt)) : null;
+      const snapStale = publishedAge != null && publishedAge > 120000;
+      let health;
+      if (snapStale) {
+        health = '<span class="stale">公开数据超过 2 分钟未同步</span>';
+      } else if (stale) {
+        health = '<span class="stale">行情延迟或策略心跳超时</span>';
+      } else {
+        health = '<span class="ok">公开页已同步</span>';
+      }
+      if (d.publishedAtHkt) health += " · 同步 " + d.publishedAtHkt;
+      else if (d.quotesHkt) health += " · " + d.quotesHkt;
+      $("health").innerHTML = health;
+      $("equity").textContent = usd(d.equity);
+      $("cash").textContent = usd(d.cash);
+      $("posValue").textContent = usd(d.posValue);
+      pn($("realized"), d.realizedPnl);
+      pn($("unrealized"), d.unrealizedPnl);
+      $("fees").textContent = usd(d.feesPaid, 4);
+      if (d.disclaimer) $("disclaimer").textContent = d.disclaimer;
+
+      const c = d.current;
+      if (!c) {
+        $("winTitle").textContent = d.error ? "暂时无法读取当前窗口" : "等待发现当前 5 分钟窗口";
+        $("winRange").textContent = d.error || "";
+        return;
+      }
+      lastEnd = c.endMs;
+      $("winTitle").textContent = c.title || c.slug;
+      $("winRange").textContent = (c.startHkt || "") + " → " + (c.endHkt || "");
+      $("countdown").textContent = c.remainingSec != null ? fmtLeft(c.remainingSec) : "--";
+      $("upBook").textContent = "买 " + px(c.up && c.up.bid) + "  /  卖 " + px(c.up && c.up.ask);
+      $("downBook").textContent = "买 " + px(c.down && c.down.bid) + "  /  卖 " + px(c.down && c.down.ask);
+      const sum = c.askSum;
+      $("askSum").textContent = "Up 卖 + Down 卖 = " + (sum != null ? sum.toFixed(3) : "--") +
+        (sum != null && sum < 1 ? "  （盘口之和已低于 1）" : "");
+
+      const inv = c.inventory || {};
+      $("upShares").textContent = Number(inv.upShares || 0).toFixed(2);
+      $("downShares").textContent = Number(inv.downShares || 0).toFixed(2);
+      $("upAvg").textContent = inv.upShares ? px(inv.upAvg) : "--";
+      $("downAvg").textContent = inv.downShares ? px(inv.downAvg) : "--";
+      $("locked").textContent = Number(inv.locked || 0).toFixed(2);
+      $("unmatched").textContent = inv.unmatchedSide
+        ? inv.unmatchedSide + " " + Number(inv.unmatchedShares).toFixed(2) + "（约 " + usd(inv.unmatchedNotional) + "）"
+        : "无";
+      $("pairCost").textContent = inv.lockedPairCost != null
+        ? "已锁对平均成本 " + Number(inv.lockedPairCost).toFixed(4) + "（含买价，不含费口径见成交明细）"
+        : "尚无锁对";
+      $("invStatus").textContent = inv.status || c.status || "--";
+
+      const st = d.stats || {};
+      $("stWindows").textContent = st.windows ?? 0;
+      $("stBoth").textContent = st.windows ? ((st.bothSidesRate || 0) * 100).toFixed(1) + "%" : "--";
+      $("stPair").textContent = st.avgPairCost != null ? Number(st.avgPairCost).toFixed(4) : "--";
+      const best = st.bestWindow, worst = st.worstWindow;
+      $("stBest").textContent = (best || worst)
+        ? (best ? usd(best.pnl) : "--") + "  /  " + (worst ? usd(worst.pnl) : "--")
+        : "--";
+
+      const fills = d.fills || [];
+      $("fills").innerHTML = fills.length ? fills.map(function (f) {
+        return "<tr><td>" + (f.atHkt || "") + "</td><td>" + (f.title || f.slug || "") +
+          "</td><td class='" + (f.side === "Up" ? "pos" : "neg") + "'>" + f.side +
+          "</td><td>" + Number(f.shares).toFixed(2) + "</td><td>" + px(f.price) +
+          "</td><td>" + usd(f.fee, 5) + "</td><td>" + (f.reason || "") + "</td></tr>";
+      }).join("") : '<tr><td colspan="7" class="sub">还没有成交</td></tr>';
+
+      const settles = d.settlements || [];
+      $("settles").innerHTML = settles.length ? settles.map(function (s) {
+        const cls = s.pnl >= 0 ? "pos" : "neg";
+        return "<tr><td>" + (s.atHkt || "") + "</td><td>" + (s.title || s.slug || "") +
+          "</td><td>" + (s.winner || "") + "</td><td>" + usd(s.payout) +
+          "</td><td class='" + cls + "'>" + usd(s.pnl) + "</td><td>锁 " +
+          Number(s.locked || 0).toFixed(2) + " / 未匹配 " + Number(s.unmatchedShares || 0).toFixed(2) +
+          (s.unmatchedSide ? " " + s.unmatchedSide : "") + "</td></tr>";
+      }).join("") : '<tr><td colspan="6" class="sub">还没有结算</td></tr>';
+    }
+
+    function tickCountdown() {
+      if (!last || !last.current || !lastEnd) return;
+      const left = Math.max(0, Math.floor((lastEnd - Date.now()) / 1000));
+      $("countdown").textContent = fmtLeft(left);
+    }
+
+    async function refresh() {
+      try {
+        const r = await fetch(STATE_URL + "?t=" + Date.now(), { cache: "no-store" });
+        if (!r.ok) throw new Error("HTTP " + r.status);
+        render(await r.json());
+      } catch (e) {
+        $("health").innerHTML = '<span class="stale">看盘数据暂不可用</span>';
+      }
+    }
+
+    refresh();
+    setInterval(refresh, 5000);
+    setInterval(tickCountdown, 250);
+  </script>
+</body>
+</html>
